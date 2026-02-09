@@ -20,6 +20,9 @@ npx cap sync
 * [`openSettings()`](#opensettings)
 * [`readSamples(...)`](#readsamples)
 * [`writeSamples(...)`](#writesamples)
+* [`startMonitoring(...)`](#startmonitoring)
+* [`stopMonitoring()`](#stopmonitoring)
+* [`addListener('monitoringUpdate', ...)`](#addlistenermonitoringupdate-)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 
@@ -121,6 +124,44 @@ writeSamples(options: WriteSamplesOptions) => Promise<WriteSamplesResult>
 --------------------
 
 
+### startMonitoring(...)
+
+```typescript
+startMonitoring(options: { types: HealthDataType[]; }) => Promise<void>
+```
+
+| Param         | Type                                      |
+| ------------- | ----------------------------------------- |
+| **`options`** | <code>{ types: HealthDataType[]; }</code> |
+
+--------------------
+
+
+### stopMonitoring()
+
+```typescript
+stopMonitoring() => Promise<void>
+```
+
+--------------------
+
+
+### addListener('monitoringUpdate', ...)
+
+```typescript
+addListener(eventName: 'monitoringUpdate', listenerFunc: (data: { type: HealthDataType; value: number; }) => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| **`eventName`**    | <code>'monitoringUpdate'</code>                                                                        |
+| **`listenerFunc`** | <code>(data: { type: <a href="#healthdatatype">HealthDataType</a>; value: number; }) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -186,6 +227,13 @@ writeSamples(options: WriteSamplesOptions) => Promise<WriteSamplesResult>
 | Prop          | Type                        |
 | ------------- | --------------------------- |
 | **`samples`** | <code>HealthSample[]</code> |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
 
 ### Type Aliases

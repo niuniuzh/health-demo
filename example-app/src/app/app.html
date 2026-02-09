@@ -63,6 +63,30 @@
     </div>
     }
 
+    <!-- Real-time Step Monitoring -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Real-time Steps</h2>
+      </div>
+      <div class="card-content">
+        <div class="result" aria-live="polite">
+          <div class="monitoring-item">
+            <span class="result-label">Live Steps:</span>
+            <span class="result-value">{{ liveData().get('steps') ?? 0 }}</span>
+          </div>
+          <div class="monitoring-item" style="margin-top: 5px;">
+            <span class="result-label">Live Heart Rate:</span>
+            <span class="result-value">{{ liveData().get('heart_rate') ?? '--' }} bpm</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="button" [class.secondary]="isMonitoring()" (click)="toggleMonitoring()">
+            {{ isMonitoring() ? 'Stop Monitoring' : 'Start Monitoring' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     @if (errorMessage()) {
     <div class="error" role="alert">
       {{ errorMessage() }}

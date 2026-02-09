@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, OnDestroy, signal } from '@angular/core';
 import { Health, HealthDataType, HealthUnit, PermissionStatusResult, ReadSamplesResult } from 'health-demo';
+import { PluginListenerHandle } from '@capacitor/core';
 
 @Component({
   selector: 'app-root',
@@ -7,7 +8,7 @@ import { Health, HealthDataType, HealthUnit, PermissionStatusResult, ReadSamples
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class App {
+export class App implements OnDestroy {
   protected readonly inputValue = signal('');
   protected readonly echoValue = signal<string | null>(null);
   protected readonly errorMessage = signal<string | null>(null);
@@ -23,9 +24,30 @@ export class App {
   protected readonly authStatus = signal<PermissionStatusResult | null>(null);
 
   protected readonly isWriting = signal(false);
+  protected readonly isMonitoring = signal(false);
+  protected readonly liveData = signal<Map<string, number>>(new Map());
   protected readonly writeStatus = signal<string | null>(null);
   protected readonly isReading = signal(false);
   protected readonly readResults = signal<ReadSamplesResult | null>(null);
+
+  private monitoringListener: PluginListenerHandle | null = null;
+
+  ngOnDestroy(): void {
+    this.cleanupMonitoring();
+  }
+
+  private async cleanupMonitoring(): Promise<void> {
+    if (this.monitoringListener) {
+      await this.monitoringListener.remove();
+      this.monitoringListener = null;
+    }
+    // ensure native monitoring is also stopped just in case
+    try {
+      await Health.stopMonitoring();
+    } catch {
+      // ignore errors during cleanup
+    }
+  }
 
   protected readonly selectedType = signal<HealthDataType>('steps');
   protected readonly dataValue = signal('100');
@@ -103,6 +125,36 @@ export class App {
       }
     } catch (error: unknown) {
       this.errorMessage.set(this.formatError(error));
+    }
+  }
+
+  protected async toggleMonitoring(): Promise<void> {
+    console.log('toggleMonitoring called, current status:', this.isMonitoring());
+    if (this.isMonitoring()) {
+      await this.cleanupMonitoring();
+      this.isMonitoring.set(false);
+    } else {
+      try {
+        await this.cleanupMonitoring(); // Clean up any lingering listener first
+
+        await Health.startMonitoring({
+          types: ['steps', 'heart_rate']
+        });
+        this.isMonitoring.set(true);
+        this.liveData.set(new Map());
+
+        this.monitoringListener = await Health.addListener('monitoringUpdate', (data: { type: HealthDataType; value: number }) => {
+          console.log('monitoringUpdate received:', JSON.stringify(data));
+          this.liveData.update(map => {
+            const newMap = new Map(map);
+            newMap.set(data.type, data.value);
+            return newMap;
+          });
+        });
+      } catch (error: unknown) {
+        this.errorMessage.set(this.formatError(error));
+        this.isMonitoring.set(false);
+      }
     }
   }
 

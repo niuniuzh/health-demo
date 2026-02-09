@@ -1,7 +1,16 @@
 package com.mycompany.plugins.example
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Build
+import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.health.connect.client.HealthConnectClient
@@ -12,21 +21,41 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import com.getcapacitor.JSObject
+import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import java.time.Instant
+import java.util.ArrayList
 import kotlin.reflect.KClass
 
-@CapacitorPlugin(name = "Health")
-class HealthPlugin : Plugin() {
+@CapacitorPlugin(
+    name = "Health",
+    permissions = [
+        Permission(
+            alias = "activity",
+            strings = [Manifest.permission.ACTIVITY_RECOGNITION]
+        ),
+        Permission(
+            alias = "sensors",
+            strings = [Manifest.permission.BODY_SENSORS]
+        )
+    ]
+)
+class HealthPlugin : Plugin(), SensorEventListener {
 
     private val implementation = Health()
+    private var sensorManager: SensorManager? = null
+    private val activeSensors = mutableMapOf<Int, Sensor?>()
+    private var initialSteps: Float = -1f
+    private val monitoringTypes = mutableSetOf<String>()
 
     companion object {
         private val ALL_TYPES = listOf("steps", "distance", "calories", "heart_rate", "sleep")
@@ -47,11 +76,142 @@ class HealthPlugin : Plugin() {
     private lateinit var permissionLauncher: ActivityResultLauncher<Intent>
 
     override fun load() {
+        super.load()
+        sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+
         permissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             handlePermissionActivityResult(result.resultCode, result.data)
         }
+    }
+
+    @PluginMethod
+    fun startMonitoring(call: PluginCall) {
+        val types = call.getArray("types")?.toList<String>() ?: emptyList()
+        Log.d("HealthPlugin", "startMonitoring called for types: $types")
+        if (types.isEmpty()) {
+            call.reject("Monitoring types array is empty")
+            return
+        }
+
+        val neededPermissions = mutableListOf<String>()
+        if (types.contains("steps") && getPermissionState("activity") != PermissionState.GRANTED) {
+            neededPermissions.add("activity")
+        }
+        if (types.contains("heart_rate") && getPermissionState("sensors") != PermissionState.GRANTED) {
+            neededPermissions.add("sensors")
+        }
+
+        if (neededPermissions.isNotEmpty()) {
+            requestPermissionForAliases(neededPermissions.toTypedArray(), call, "monitoringPermissionCallback")
+            return
+        }
+
+        startMonitoringInternal(call, types)
+    }
+
+    @PermissionCallback
+    private fun monitoringPermissionCallback(call: PluginCall) {
+        val types = call.getArray("types")?.toList<String>() ?: emptyList()
+        val denied = mutableListOf<String>()
+        if (types.contains("steps") && getPermissionState("activity") != PermissionState.GRANTED) {
+            denied.add("Activity Recognition")
+        }
+        if (types.contains("heart_rate") && getPermissionState("sensors") != PermissionState.GRANTED) {
+            denied.add("Body Sensors")
+        }
+
+        if (denied.isNotEmpty()) {
+            call.reject("Permissions denied: ${denied.joinToString(", ")}")
+        } else {
+            startMonitoringInternal(call, types)
+        }
+    }
+
+    private fun startMonitoringInternal(call: PluginCall, types: List<String>) {
+        stopMonitoringInternal()
+        monitoringTypes.addAll(types)
+
+        val failedTypes = mutableListOf<String>()
+
+        types.forEach { type ->
+            val sensorType = when (type) {
+                "steps" -> Sensor.TYPE_STEP_COUNTER
+                "heart_rate" -> Sensor.TYPE_HEART_RATE
+                else -> null
+            }
+
+            if (sensorType != null) {
+                val sensor = sensorManager?.getDefaultSensor(sensorType)
+                if (sensor != null) {
+                    val registered = sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI) ?: false
+                    if (registered) {
+                        Log.d("HealthPlugin", "Successfully registered listener for sensor: ${sensor.name}")
+                        activeSensors[sensorType] = sensor
+                        if (type == "steps") initialSteps = -1f
+                    } else {
+                        Log.e("HealthPlugin", "Failed to register listener for sensor: ${sensor.name}")
+                        failedTypes.add(type)
+                    }
+                } else {
+                    Log.e("HealthPlugin", "Sensor $sensorType not found on device")
+                    failedTypes.add(type)
+                }
+            }
+        }
+
+        if (failedTypes.size == types.size && types.isNotEmpty()) {
+            call.reject("Failed to start monitoring for any of the requested types: ${failedTypes.joinToString()}")
+        } else {
+            val ret = JSObject()
+            if (failedTypes.isNotEmpty()) {
+                val failedArray = JSONArray(failedTypes)
+                ret.put("failedTypes", failedArray)
+            }
+            call.resolve(ret)
+        }
+    }
+
+    @PluginMethod
+    fun stopMonitoring(call: PluginCall) {
+        stopMonitoringInternal()
+        call.resolve()
+    }
+
+    private fun stopMonitoringInternal() {
+        sensorManager?.unregisterListener(this)
+        activeSensors.clear()
+        monitoringTypes.clear()
+        initialSteps = -1f
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        val sensorType = event?.sensor?.type ?: return
+        val value = event.values[0]
+
+        val type = when (sensorType) {
+            Sensor.TYPE_STEP_COUNTER -> "steps"
+            Sensor.TYPE_HEART_RATE -> "heart_rate"
+            else -> null
+        } ?: return
+
+        val resultValue = if (type == "steps") {
+            if (initialSteps < 0) initialSteps = value
+            (value - initialSteps).toInt().toDouble()
+        } else {
+            value.toDouble()
+        }
+
+        val data = JSObject()
+        data.put("type", type)
+        data.put("value", resultValue)
+        Log.v("HealthPlugin", "Value update: $type = $resultValue")
+        notifyListeners("monitoringUpdate", data)
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not needed
     }
 
     private fun handlePermissionActivityResult(resultCode: Int, data: Intent?) {

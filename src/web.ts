@@ -2,6 +2,7 @@ import { WebPlugin } from '@capacitor/core';
 
 import type {
   HealthPlugin,
+  HealthDataType,
   PermissionRequestOptions,
   PermissionStatusResult,
   ReadSamplesOptions,
@@ -30,6 +31,45 @@ export class HealthWeb extends WebPlugin implements HealthPlugin {
 
   async openSettings(): Promise<{ opened: boolean }> {
     throw this.unimplemented('openSettings is not implemented on web.');
+  }
+
+  private monitoringIntervals: Map<HealthDataType, any> = new Map();
+  private mockValues: Map<HealthDataType, number> = new Map();
+
+  async startMonitoring(options: { types: HealthDataType[] }): Promise<void> {
+    this.stopMonitoring();
+
+    options.types.forEach(type => {
+      if (!this.mockValues.has(type)) {
+        this.mockValues.set(type, 0);
+      }
+
+      const interval = setInterval(() => {
+        let delta = 0;
+        if (type === 'steps') delta = Math.floor(Math.random() * 5);
+        if (type === 'heart_rate') delta = Math.floor(Math.random() * 20) - 10; // Simple drift
+
+        const currentVal = this.mockValues.get(type) || 0;
+        let newVal = currentVal + delta;
+        if (type === 'heart_rate') {
+          if (newVal < 60) newVal = 60;
+          if (newVal > 180) newVal = 180;
+        }
+
+        this.mockValues.set(type, newVal);
+        this.notifyListeners('monitoringUpdate', {
+          type,
+          value: newVal
+        });
+      }, 1000);
+
+      this.monitoringIntervals.set(type, interval);
+    });
+  }
+
+  async stopMonitoring(): Promise<void> {
+    this.monitoringIntervals.forEach(interval => clearInterval(interval));
+    this.monitoringIntervals.clear();
   }
 
   async readSamples(_options: ReadSamplesOptions): Promise<ReadSamplesResult> {

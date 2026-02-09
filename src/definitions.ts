@@ -1,3 +1,5 @@
+import type { PluginListenerHandle } from '@capacitor/core';
+
 export interface HealthPlugin {
   echo(options: { value: string }): Promise<{ value: string }>;
   isAvailable(): Promise<{ available: boolean; platform: "ios" | "android" | "web" }>;
@@ -6,6 +8,12 @@ export interface HealthPlugin {
   openSettings(): Promise<{ opened: boolean }>;
   readSamples(options: ReadSamplesOptions): Promise<ReadSamplesResult>;
   writeSamples(options: WriteSamplesOptions): Promise<WriteSamplesResult>;
+  startMonitoring(options: { types: HealthDataType[] }): Promise<void>;
+  stopMonitoring(): Promise<void>;
+  addListener(
+    eventName: 'monitoringUpdate',
+    listenerFunc: (data: { type: HealthDataType; value: number }) => void,
+  ): Promise<PluginListenerHandle>;
 }
 
 export type HealthDataType =
