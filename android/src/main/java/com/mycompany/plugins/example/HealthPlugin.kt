@@ -2,7 +2,6 @@ package com.mycompany.plugins.example
 
 import android.app.Activity
 import android.content.Intent
-import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.health.connect.client.HealthConnectClient
@@ -20,6 +19,8 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import java.time.Instant
 import kotlin.reflect.KClass
 
 @CapacitorPlugin(name = "Health")
@@ -28,7 +29,6 @@ class HealthPlugin : Plugin() {
     private val implementation = Health()
 
     companion object {
-        private const val REQUEST_CODE_PERMISSION = 1001
         private val ALL_TYPES = listOf("steps", "distance", "calories", "heart_rate", "sleep")
 
         fun getRecordType(type: String): KClass<out androidx.health.connect.client.records.Record>? {
@@ -91,12 +91,7 @@ class HealthPlugin : Plugin() {
     @PluginMethod
     fun isAvailable(call: PluginCall) {
         val status = HealthConnectClient.getSdkStatus(context)
-        val available = status == HealthConnectClient.SDK_AVAILABLE
-
-        val ret = JSObject()
-        ret.put("available", available)
-        ret.put("platform", "android")
-        call.resolve(ret)
+        call.resolve(availabilityPayload(status))
     }
 
     @PluginMethod
@@ -149,5 +144,95 @@ class HealthPlugin : Plugin() {
         }
 
         permissionLauncher.launch(intent)
+    }
+
+
+    @PluginMethod
+    fun readSamples(call: PluginCall) {
+        val types = call.getArray("types")?.toList<String>() ?: emptyList()
+        val startDateStr = call.getString("startDate")
+        val endDateStr = call.getString("endDate")
+        val limit = call.getInt("limit") ?: 1000
+        val ascending = call.getBoolean("ascending") ?: true
+        val includeMetadata = call.getBoolean("includeMetadata") ?: false
+
+        if (startDateStr == null || endDateStr == null) {
+            call.reject("startDate and endDate are required")
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val client = getClientOrReject(call) ?: return@launch
+            try {
+                val start = Instant.parse(startDateStr)
+                val end = Instant.parse(endDateStr)
+
+                val samples = implementation.readSamples(client, types, start, end, limit, ascending, includeMetadata)
+
+                val ret = JSObject()
+                val samplesArray = JSONArray(samples)
+                ret.put("samples", samplesArray)
+                call.resolve(ret)
+
+            } catch (e: Exception) {
+                call.reject("Failed to read samples: ${e.message}", e)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun writeSamples(call: PluginCall) {
+        val samplesArray = call.getArray("samples")
+        if (samplesArray == null) {
+            call.reject("samples array is required")
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val client = getClientOrReject(call) ?: return@launch
+            try {
+                val jsSamples = mutableListOf<JSObject>()
+                for (i in 0 until samplesArray.length()) {
+                    val jsonObj = samplesArray.getJSONObject(i)
+                    jsSamples.add(JSObject(jsonObj.toString()))
+                }
+                val count = implementation.writeSamples(client, jsSamples)
+
+                val ret = JSObject()
+                ret.put("success", true)
+                ret.put("writtenCount", count)
+                call.resolve(ret)
+
+            } catch (e: Exception) {
+               call.reject("Failed to write samples: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun getClientOrReject(call: PluginCall): HealthConnectClient? {
+        val status = HealthConnectClient.getSdkStatus(context)
+        if (status != HealthConnectClient.SDK_AVAILABLE) {
+            call.reject(availabilityReason(status))
+            return null
+        }
+        return HealthConnectClient.getOrCreate(context)
+    }
+
+    private fun availabilityPayload(status: Int): JSObject {
+        val payload = JSObject()
+        payload.put("platform", "android")
+        payload.put("available", status == HealthConnectClient.SDK_AVAILABLE)
+        if (status != HealthConnectClient.SDK_AVAILABLE) {
+            payload.put("reason", availabilityReason(status))
+        }
+        return payload
+    }
+
+    private fun availabilityReason(status: Int): String {
+        return when (status) {
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "Health Connect needs an update."
+            HealthConnectClient.SDK_UNAVAILABLE -> "Health Connect is unavailable on this device."
+            else -> "Health Connect availability unknown."
+        }
     }
 }

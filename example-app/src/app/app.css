@@ -159,3 +159,14 @@ h1 {
     transform: rotate(360deg);
   }
 }
+
+.sample-item {
+  background: rgba(10, 16, 26, 0.5);
+  border: 1px solid rgba(122, 164, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
