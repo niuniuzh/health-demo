@@ -11,75 +11,106 @@
 
     <div class="field">
       <label class="label" for="echo-input">Message</label>
-      <input
-        id="echo-input"
-        class="input"
-        type="text"
-        inputmode="text"
-        autocomplete="off"
-        spellcheck="false"
-        [value]="inputValue()"
-        (input)="onInput($event)"
-        placeholder="Type a message to echo"
-      />
+      <input id="echo-input" class="input" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+        [value]="inputValue()" (input)="onInput($event)" placeholder="Type a message to echo" />
     </div>
 
     <div class="actions">
-      <button
-        type="button"
-        class="button"
-        [disabled]="!canEcho()"
-        (click)="runEcho()"
-      >
+      <button type="button" class="button" [disabled]="!canEcho()" (click)="runEcho()">
         @if (isBusy()) {
-          <span class="spinner" aria-hidden="true"></span>
-          Sending…
+        <span class="spinner" aria-hidden="true"></span>
+        Sending…
         } @else {
-          Echo
+        Echo
         }
       </button>
     </div>
 
     <div class="actions">
-      <button
-        type="button"
-        class="button secondary"
-        [disabled]="!canCheck()"
-        (click)="checkAvailability()"
-      >
+      <button type="button" class="button secondary" [disabled]="!canCheck()" (click)="checkAvailability()">
         @if (isChecking()) {
-          <span class="spinner" aria-hidden="true"></span>
-          Checking…
+        <span class="spinner" aria-hidden="true"></span>
+        Checking…
         } @else {
-          Check Availability
+        Check Availability
         }
       </button>
     </div>
 
     @if (availability()) {
-      <div class="result" aria-live="polite">
-        <span class="result-label">Health Connect</span>
-        <span class="result-value">
-          @if (availability()!.available) {
-            Available on {{ availability()!.platform }}
-          } @else {
-            Not available on {{ availability()!.platform }}
-          }
-        </span>
-      </div>
+    <div class="result" aria-live="polite">
+      <span class="result-label">Health Connect</span>
+      <span class="result-value">
+        @if (availability()!.available) {
+        Available on {{ availability()!.platform }}
+        } @else {
+        Not available on {{ availability()!.platform }}
+        }
+      </span>
+    </div>
     }
 
     @if (echoValue()) {
-      <div class="result" aria-live="polite">
-        <span class="result-label">Echo result</span>
-        <span class="result-value">{{ echoValue() }}</span>
-      </div>
+    <div class="result" aria-live="polite">
+      <span class="result-label">Echo result</span>
+      <span class="result-value">{{ echoValue() }}</span>
+    </div>
     }
 
     @if (errorMessage()) {
-      <div class="error" role="alert">
-        {{ errorMessage() }}
+    <div class="error" role="alert">
+      {{ errorMessage() }}
+    </div>
+    }
+  </section>
+
+  <section class="card" aria-labelledby="auth-title">
+    <header class="header">
+      <h2 id="auth-title">Authorization</h2>
+      <p class="subtitle">
+        Test requestAuthorization and checkAuthorizationStatus methods.
+      </p>
+    </header>
+
+    <div class="actions">
+      <button type="button" class="button" [disabled]="!canRequestAuth()" (click)="requestAuth()">
+        @if (isRequestingAuth()) {
+        <span class="spinner" aria-hidden="true"></span>
+        Requesting…
+        } @else {
+        Request Authorization
+        }
+      </button>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="button secondary" [disabled]="!canCheckAuth()" (click)="checkAuth()">
+        @if (isCheckingAuth()) {
+        <span class="spinner" aria-hidden="true"></span>
+        Checking…
+        } @else {
+        Check Authorization Status
+        }
+      </button>
+    </div>
+
+    @if (authStatus()) {
+    <div class="result" aria-live="polite">
+      <span class="result-label">Read Permissions</span>
+      <div class="result-value">
+        @for (key of getAuthStatusKeys(); track key) {
+        <div>{{ key }}: {{ authStatus()!.read[key] }}</div>
+        }
       </div>
+    </div>
+    <div class="result" aria-live="polite">
+      <span class="result-label">Write Permissions</span>
+      <div class="result-value">
+        @for (key of getAuthStatusKeys(); track key) {
+        <div>{{ key }}: {{ authStatus()!.write[key] }}</div>
+        }
+      </div>
+    </div>
     }
   </section>
 </main>

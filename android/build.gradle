@@ -6,6 +6,7 @@ buildscript {
         androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.7.0'
         kotlinVersion = project.hasProperty('kotlinVersion') ? rootProject.ext.kotlinVersion : '1.9.24'
         healthConnectVersion = project.hasProperty('healthConnectVersion') ? rootProject.ext.healthConnectVersion : '1.1.0-alpha12'
+        coroutinesVersion = project.hasProperty('coroutinesVersion') ? rootProject.ext.coroutinesVersion : '1.8.1'
     }
     repositories {
         google()
@@ -60,6 +61,9 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
     implementation "androidx.health.connect:connect-client:$healthConnectVersion"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.7.0"
+    implementation "androidx.activity:activity-ktx:1.8.2"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

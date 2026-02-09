@@ -1,16 +1,83 @@
 package com.mycompany.plugins.example
 
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
-import androidx.health.connect.client.HealthConnectClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlin.reflect.KClass
 
 @CapacitorPlugin(name = "Health")
 class HealthPlugin : Plugin() {
 
     private val implementation = Health()
+
+    companion object {
+        private const val REQUEST_CODE_PERMISSION = 1001
+        private val ALL_TYPES = listOf("steps", "distance", "calories", "heart_rate", "sleep")
+
+        fun getRecordType(type: String): KClass<out androidx.health.connect.client.records.Record>? {
+            return when (type) {
+                "steps" -> StepsRecord::class
+                "distance" -> DistanceRecord::class
+                "calories" -> TotalCaloriesBurnedRecord::class
+                "heart_rate" -> HeartRateRecord::class
+                "sleep" -> SleepSessionRecord::class
+                else -> null
+            }
+        }
+    }
+
+    private var permissionCall: PluginCall? = null
+    private lateinit var permissionLauncher: ActivityResultLauncher<Intent>
+
+    override fun load() {
+        permissionLauncher = activity.registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            handlePermissionActivityResult(result.resultCode, result.data)
+        }
+    }
+
+    private fun handlePermissionActivityResult(resultCode: Int, data: Intent?) {
+        val call = permissionCall ?: return
+        permissionCall = null
+
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val readBundle = data.getBundleExtra(HealthPermissionActivity.RESULT_READ_STATUS)
+            val writeBundle = data.getBundleExtra(HealthPermissionActivity.RESULT_WRITE_STATUS)
+
+            val ret = JSObject()
+            val readObj = JSObject()
+            val writeObj = JSObject()
+
+            ALL_TYPES.forEach { type ->
+                readObj.put(type, readBundle?.getString(type) ?: "denied")
+                writeObj.put(type, writeBundle?.getString(type) ?: "denied")
+            }
+
+            ret.put("read", readObj)
+            ret.put("write", writeObj)
+            call.resolve(ret)
+        } else {
+            call.reject("Permission request cancelled or failed")
+        }
+    }
 
     @PluginMethod
     fun echo(call: PluginCall) {
@@ -30,5 +97,57 @@ class HealthPlugin : Plugin() {
         ret.put("available", available)
         ret.put("platform", "android")
         call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun checkAuthorizationStatus(call: PluginCall) {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val healthConnectClient = HealthConnectClient.getOrCreate(context)
+                val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
+
+                val ret = JSObject()
+                val readObj = JSObject()
+                val writeObj = JSObject()
+
+                ALL_TYPES.forEach { type ->
+                    val recordClass = getRecordType(type)
+                    if (recordClass != null) {
+                        val readPerm = HealthPermission.getReadPermission(recordClass)
+                        val writePerm = HealthPermission.getWritePermission(recordClass)
+
+                        readObj.put(type, if (grantedPermissions.contains(readPerm)) "granted" else "denied")
+                        writeObj.put(type, if (grantedPermissions.contains(writePerm)) "granted" else "denied")
+                    } else {
+                        readObj.put(type, "unsupported")
+                        writeObj.put(type, "unsupported")
+                    }
+                }
+
+                ret.put("read", readObj)
+                ret.put("write", writeObj)
+                call.resolve(ret)
+            } catch (e: Exception) {
+                call.reject("Failed to check authorization status: ${e.message}", e)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun requestAuthorization(call: PluginCall) {
+        val readTypesArray = call.getArray("read")
+        val writeTypesArray = call.getArray("write")
+
+        val readTypes = readTypesArray?.toList<String>() ?: emptyList()
+        val writeTypes = writeTypesArray?.toList<String>() ?: emptyList()
+
+        permissionCall = call
+
+        val intent = Intent(context, HealthPermissionActivity::class.java).apply {
+            putStringArrayListExtra(HealthPermissionActivity.EXTRA_READ_TYPES, ArrayList(readTypes))
+            putStringArrayListExtra(HealthPermissionActivity.EXTRA_WRITE_TYPES, ArrayList(writeTypes))
+        }
+
+        permissionLauncher.launch(intent)
     }
 }

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { Health } from 'health-demo';
+import { Health, HealthDataType, PermissionStatusResult } from 'health-demo';
 
 @Component({
   selector: 'app-root',
@@ -18,11 +18,17 @@ export class App {
     platform: 'ios' | 'android' | 'web';
   } | null>(null);
 
+  protected readonly isRequestingAuth = signal(false);
+  protected readonly isCheckingAuth = signal(false);
+  protected readonly authStatus = signal<PermissionStatusResult | null>(null);
+
   protected readonly canEcho = computed(() => {
     return this.inputValue().trim().length > 0 && !this.isBusy();
   });
 
   protected readonly canCheck = computed(() => !this.isChecking());
+  protected readonly canRequestAuth = computed(() => !this.isRequestingAuth());
+  protected readonly canCheckAuth = computed(() => !this.isCheckingAuth());
 
   protected onInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
@@ -65,6 +71,51 @@ export class App {
     } finally {
       this.isChecking.set(false);
     }
+  }
+
+  protected async requestAuth(): Promise<void> {
+    if (this.isRequestingAuth()) {
+      return;
+    }
+
+    this.isRequestingAuth.set(true);
+    this.errorMessage.set(null);
+
+    try {
+      const result = await Health.requestAuthorization({
+        read: ['steps', 'heart_rate', 'distance', 'calories', 'sleep'],
+        write: ['steps']
+      });
+      this.authStatus.set(result);
+    } catch (error: unknown) {
+      this.errorMessage.set(this.formatError(error));
+    } finally {
+      this.isRequestingAuth.set(false);
+    }
+  }
+
+  protected async checkAuth(): Promise<void> {
+    if (this.isCheckingAuth()) {
+      return;
+    }
+
+    this.isCheckingAuth.set(true);
+    this.errorMessage.set(null);
+
+    try {
+      const result = await Health.checkAuthorizationStatus();
+      this.authStatus.set(result);
+    } catch (error: unknown) {
+      this.errorMessage.set(this.formatError(error));
+    } finally {
+      this.isCheckingAuth.set(false);
+    }
+  }
+
+  protected getAuthStatusKeys(): HealthDataType[] {
+    const status = this.authStatus();
+    if (!status) return [];
+    return Object.keys(status.read) as HealthDataType[];
   }
 
   private formatError(error: unknown): string {

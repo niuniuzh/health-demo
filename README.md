@@ -15,8 +15,8 @@ npx cap sync
 
 * [`echo(...)`](#echo)
 * [`isAvailable()`](#isavailable)
-* [`requestPermissions(...)`](#requestpermissions)
-* [`checkPermissions()`](#checkpermissions)
+* [`requestAuthorization(...)`](#requestauthorization)
+* [`checkAuthorizationStatus()`](#checkauthorizationstatus)
 * [`openSettings()`](#opensettings)
 * [`readSamples(...)`](#readsamples)
 * [`writeSamples(...)`](#writesamples)
@@ -54,10 +54,10 @@ isAvailable() => Promise<{ available: boolean; platform: "ios" | "android" | "we
 --------------------
 
 
-### requestPermissions(...)
+### requestAuthorization(...)
 
 ```typescript
-requestPermissions(options?: PermissionRequestOptions | undefined) => Promise<PermissionStatusResult>
+requestAuthorization(options?: PermissionRequestOptions | undefined) => Promise<PermissionStatusResult>
 ```
 
 | Param         | Type                                                                          |
@@ -69,10 +69,10 @@ requestPermissions(options?: PermissionRequestOptions | undefined) => Promise<Pe
 --------------------
 
 
-### checkPermissions()
+### checkAuthorizationStatus()
 
 ```typescript
-checkPermissions() => Promise<PermissionStatusResult>
+checkAuthorizationStatus() => Promise<PermissionStatusResult>
 ```
 
 **Returns:** <code>Promise&lt;<a href="#permissionstatusresult">PermissionStatusResult</a>&gt;</code>

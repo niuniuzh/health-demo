@@ -20,12 +20,12 @@ export class HealthWeb extends WebPlugin implements HealthPlugin {
     return { available: false, platform: "web" };
   }
 
-  async requestPermissions(_options?: PermissionRequestOptions): Promise<PermissionStatusResult> {
-    throw this.unimplemented('requestPermissions is not implemented on web.');
+  async requestAuthorization(_options?: PermissionRequestOptions): Promise<PermissionStatusResult> {
+    throw this.unimplemented('requestAuthorization is not implemented on web.');
   }
 
-  async checkPermissions(): Promise<PermissionStatusResult> {
-    throw this.unimplemented('checkPermissions is not implemented on web.');
+  async checkAuthorizationStatus(): Promise<PermissionStatusResult> {
+    throw this.unimplemented('checkAuthorizationStatus is not implemented on web.');
   }
 
   async openSettings(): Promise<{ opened: boolean }> {

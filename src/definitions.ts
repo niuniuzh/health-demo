@@ -1,8 +1,8 @@
 export interface HealthPlugin {
   echo(options: { value: string }): Promise<{ value: string }>;
   isAvailable(): Promise<{ available: boolean; platform: "ios" | "android" | "web" }>;
-  requestPermissions(options?: PermissionRequestOptions): Promise<PermissionStatusResult>;
-  checkPermissions(): Promise<PermissionStatusResult>;
+  requestAuthorization(options?: PermissionRequestOptions): Promise<PermissionStatusResult>;
+  checkAuthorizationStatus(): Promise<PermissionStatusResult>;
   openSettings(): Promise<{ opened: boolean }>;
   readSamples(options: ReadSamplesOptions): Promise<ReadSamplesResult>;
   writeSamples(options: WriteSamplesOptions): Promise<WriteSamplesResult>;
