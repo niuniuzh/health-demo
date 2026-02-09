@@ -8,12 +8,16 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Length
 import com.getcapacitor.JSObject
 import com.getcapacitor.Logger
 import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import kotlin.reflect.KClass
 
 class Health {
@@ -21,6 +25,20 @@ class Health {
     fun echo(value: String?): String? {
         Logger.info("Echo", value ?: "null")
         return value
+    }
+
+    suspend fun readTotalStepsToday(healthConnectClient: HealthConnectClient): Long {
+        val now = ZonedDateTime.now()
+        val startOfDay = now.with(LocalTime.MIN).toInstant()
+        val endOfTime = now.toInstant()
+
+        val response = healthConnectClient.aggregate(
+            AggregateRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfTime)
+            )
+        )
+        return response[StepsRecord.COUNT_TOTAL] ?: 0L
     }
 
     suspend fun readSamples(

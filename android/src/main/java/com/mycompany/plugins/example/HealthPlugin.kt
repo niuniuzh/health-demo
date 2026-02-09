@@ -55,6 +55,7 @@ class HealthPlugin : Plugin(), SensorEventListener {
     private var sensorManager: SensorManager? = null
     private val activeSensors = mutableMapOf<Int, Sensor?>()
     private var initialSteps: Float = -1f
+    private var dailyBaselineSteps: Long = 0L
     private val monitoringTypes = mutableSetOf<String>()
 
     companion object {
@@ -108,7 +109,9 @@ class HealthPlugin : Plugin(), SensorEventListener {
             return
         }
 
-        startMonitoringInternal(call, types)
+        CoroutineScope(Dispatchers.Main).launch {
+            startMonitoringInternal(call, types)
+        }
     }
 
     @PermissionCallback
@@ -125,13 +128,30 @@ class HealthPlugin : Plugin(), SensorEventListener {
         if (denied.isNotEmpty()) {
             call.reject("Permissions denied: ${denied.joinToString(", ")}")
         } else {
-            startMonitoringInternal(call, types)
+            CoroutineScope(Dispatchers.Main).launch {
+                startMonitoringInternal(call, types)
+            }
         }
     }
 
-    private fun startMonitoringInternal(call: PluginCall, types: List<String>) {
+    private suspend fun startMonitoringInternal(call: PluginCall, types: List<String>) {
         stopMonitoringInternal()
         monitoringTypes.addAll(types)
+
+        // Fetch baseline steps if needed
+        if (types.contains("steps")) {
+            try {
+                val client = getOrCreateClient()
+                if (client != null) {
+                    dailyBaselineSteps = implementation.readTotalStepsToday(client)
+                    Log.d("HealthPlugin", "Daily baseline steps fetched: $dailyBaselineSteps")
+                }
+            } catch (e: Exception) {
+                Log.e("HealthPlugin", "Failed to fetch daily baseline steps", e)
+                // Fallback to 0 if Health Connect is not available or fails
+                dailyBaselineSteps = 0
+            }
+        }
 
         val failedTypes = mutableListOf<String>()
 
@@ -184,6 +204,7 @@ class HealthPlugin : Plugin(), SensorEventListener {
         activeSensors.clear()
         monitoringTypes.clear()
         initialSteps = -1f
+        dailyBaselineSteps = 0L
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -198,7 +219,8 @@ class HealthPlugin : Plugin(), SensorEventListener {
 
         val resultValue = if (type == "steps") {
             if (initialSteps < 0) initialSteps = value
-            (value - initialSteps).toInt().toDouble()
+            val delta = (value - initialSteps).toLong()
+            (dailyBaselineSteps + delta).toDouble()
         } else {
             value.toDouble()
         }
@@ -422,9 +444,18 @@ class HealthPlugin : Plugin(), SensorEventListener {
     }
 
     private fun getClientOrReject(call: PluginCall): HealthConnectClient? {
+        val client = getOrCreateClient()
+        if (client == null) {
+            val status = HealthConnectClient.getSdkStatus(context)
+            call.reject(availabilityReason(status))
+            return null
+        }
+        return client
+    }
+
+    private fun getOrCreateClient(): HealthConnectClient? {
         val status = HealthConnectClient.getSdkStatus(context)
         if (status != HealthConnectClient.SDK_AVAILABLE) {
-            call.reject(availabilityReason(status))
             return null
         }
         return HealthConnectClient.getOrCreate(context)

@@ -137,12 +137,7 @@ export class App implements OnDestroy {
       try {
         await this.cleanupMonitoring(); // Clean up any lingering listener first
 
-        await Health.startMonitoring({
-          types: ['steps', 'heart_rate']
-        });
-        this.isMonitoring.set(true);
-        this.liveData.set(new Map());
-
+        // 1. Add listener FIRST to avoid missing the initial baseline event
         this.monitoringListener = await Health.addListener('monitoringUpdate', (data: { type: HealthDataType; value: number }) => {
           console.log('monitoringUpdate received:', JSON.stringify(data));
           this.liveData.update(map => {
@@ -151,9 +146,20 @@ export class App implements OnDestroy {
             return newMap;
           });
         });
+
+        // 2. Start monitoring
+        await Health.startMonitoring({
+          types: ['steps', 'heart_rate']
+        });
+
+        this.isMonitoring.set(true);
+        // We don't clear the whole map immediately if we want to show transition, 
+        // allow values to persist until updated by the new session.
+
       } catch (error: unknown) {
         this.errorMessage.set(this.formatError(error));
         this.isMonitoring.set(false);
+        await this.cleanupMonitoring();
       }
     }
   }

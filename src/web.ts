@@ -38,31 +38,37 @@ export class HealthWeb extends WebPlugin implements HealthPlugin {
 
   async startMonitoring(options: { types: HealthDataType[] }): Promise<void> {
     this.stopMonitoring();
-
     options.types.forEach(type => {
+      // Only initialize if we don't have a value yet (from a previous session)
       if (!this.mockValues.has(type)) {
-        this.mockValues.set(type, 0);
+        const baseline = type === 'steps' ? 5000 : 75;
+        this.mockValues.set(type, baseline);
       }
 
-      const interval = setInterval(() => {
-        let delta = 0;
-        if (type === 'steps') delta = Math.floor(Math.random() * 5);
-        if (type === 'heart_rate') delta = Math.floor(Math.random() * 20) - 10; // Simple drift
+      const initialVal = this.mockValues.get(type)!;
 
-        const currentVal = this.mockValues.get(type) || 0;
-        let newVal = currentVal + delta;
-        if (type === 'heart_rate') {
-          if (newVal < 60) newVal = 60;
-          if (newVal > 180) newVal = 180;
+      // Trigger an immediate update so the UI doesn't show 0/empty initially
+      this.notifyListeners('monitoringUpdate', {
+        type,
+        value: initialVal,
+      });
+
+      const interval = setInterval(() => {
+        let newVal = this.mockValues.get(type) || 0;
+        if (type === 'steps') {
+          newVal += Math.floor(Math.random() * 3) + 1; // 1-3 steps increment
+        } else if (type === 'heart_rate') {
+          // Random walk for heart rate
+          const drift = Math.floor(Math.random() * 5) - 2;
+          newVal = Math.max(60, Math.min(180, newVal + drift));
         }
 
         this.mockValues.set(type, newVal);
         this.notifyListeners('monitoringUpdate', {
           type,
-          value: newVal
+          value: newVal,
         });
       }, 1000);
-
       this.monitoringIntervals.set(type, interval);
     });
   }
