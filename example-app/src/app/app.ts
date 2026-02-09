@@ -94,6 +94,18 @@ export class App {
     }
   }
 
+  protected async openSettings(): Promise<void> {
+    this.errorMessage.set(null);
+    try {
+      const result = await Health.openSettings();
+      if (!result.opened) {
+        this.errorMessage.set('Could not open settings. Health Connect might not be available.');
+      }
+    } catch (error: unknown) {
+      this.errorMessage.set(this.formatError(error));
+    }
+  }
+
   protected async requestAuth(): Promise<void> {
     if (this.isRequestingAuth()) {
       return;

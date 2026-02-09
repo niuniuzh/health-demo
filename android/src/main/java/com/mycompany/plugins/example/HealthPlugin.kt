@@ -148,6 +148,58 @@ class HealthPlugin : Plugin() {
 
 
     @PluginMethod
+    fun openSettings(call: PluginCall) {
+        val status = HealthConnectClient.getSdkStatus(context)
+        
+        // If it's available, try opening settings
+        if (status == HealthConnectClient.SDK_AVAILABLE) {
+            try {
+                val intent = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+
+                val ret = JSObject()
+                ret.put("opened", true)
+                call.resolve(ret)
+                return
+            } catch (e: Exception) {
+                // Fallback to Play Store if settings intent fails for some reason
+            }
+        }
+
+        // If update required or not installed/available, try to open Play Store
+        try {
+            val appId = "com.google.android.apps.healthdata"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = android.net.Uri.parse("market://details?id=$appId")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            
+            val ret = JSObject()
+            ret.put("opened", true)
+            ret.put("fallbackToStore", true)
+            call.resolve(ret)
+        } catch (e: Exception) {
+            // If market intent fails, try browser
+            try {
+                val appId = "com.google.android.apps.healthdata"
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    data = android.net.Uri.parse("https://play.google.com/store/apps/details?id=$appId")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                val ret = JSObject()
+                ret.put("opened", true)
+                ret.put("fallbackToStore", true)
+                call.resolve(ret)
+            } catch (err: Exception) {
+                call.reject("Failed to open Health Connect settings or Play Store: ${err.message}", err)
+            }
+        }
+    }
+
+    @PluginMethod
     fun readSamples(call: PluginCall) {
         val types = call.getArray("types")?.toList<String>() ?: emptyList()
         val startDateStr = call.getString("startDate")
