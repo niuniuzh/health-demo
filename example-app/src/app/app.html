@@ -1,0 +1,56 @@
+<main class="page">
+  <section class="card" aria-labelledby="page-title">
+    <header class="header">
+      <p class="eyebrow">health-demo plugin</p>
+      <h1 id="page-title">Echo Demo</h1>
+      <p class="subtitle">
+        Calls the Capacitor plugin `echo` method and prints the response. On web
+        it will report that the method is not implemented.
+      </p>
+    </header>
+
+    <div class="field">
+      <label class="label" for="echo-input">Message</label>
+      <input
+        id="echo-input"
+        class="input"
+        type="text"
+        inputmode="text"
+        autocomplete="off"
+        spellcheck="false"
+        [value]="inputValue()"
+        (input)="onInput($event)"
+        placeholder="Type a message to echo"
+      />
+    </div>
+
+    <div class="actions">
+      <button
+        type="button"
+        class="button"
+        [disabled]="!canEcho()"
+        (click)="runEcho()"
+      >
+        @if (isBusy()) {
+          <span class="spinner" aria-hidden="true"></span>
+          Sending…
+        } @else {
+          Echo
+        }
+      </button>
+    </div>
+
+    @if (echoValue()) {
+      <div class="result" aria-live="polite">
+        <span class="result-label">Echo result</span>
+        <span class="result-value">{{ echoValue() }}</span>
+      </div>
+    }
+
+    @if (errorMessage()) {
+      <div class="error" role="alert">
+        {{ errorMessage() }}
+      </div>
+    }
+  </section>
+</main>
