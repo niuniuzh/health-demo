@@ -12,10 +12,17 @@ export class App {
   protected readonly echoValue = signal<string | null>(null);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isBusy = signal(false);
+  protected readonly isChecking = signal(false);
+  protected readonly availability = signal<{
+    available: boolean;
+    platform: 'ios' | 'android' | 'web';
+  } | null>(null);
 
   protected readonly canEcho = computed(() => {
     return this.inputValue().trim().length > 0 && !this.isBusy();
   });
+
+  protected readonly canCheck = computed(() => !this.isChecking());
 
   protected onInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
@@ -39,6 +46,24 @@ export class App {
       this.errorMessage.set(this.formatError(error));
     } finally {
       this.isBusy.set(false);
+    }
+  }
+
+  protected async checkAvailability(): Promise<void> {
+    if (this.isChecking()) {
+      return;
+    }
+
+    this.isChecking.set(true);
+    this.errorMessage.set(null);
+
+    try {
+      const result = await Health.isAvailable();
+      this.availability.set(result);
+    } catch (error: unknown) {
+      this.errorMessage.set(this.formatError(error));
+    } finally {
+      this.isChecking.set(false);
     }
   }
 

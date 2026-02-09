@@ -40,6 +40,35 @@
       </button>
     </div>
 
+    <div class="actions">
+      <button
+        type="button"
+        class="button secondary"
+        [disabled]="!canCheck()"
+        (click)="checkAvailability()"
+      >
+        @if (isChecking()) {
+          <span class="spinner" aria-hidden="true"></span>
+          Checking…
+        } @else {
+          Check Availability
+        }
+      </button>
+    </div>
+
+    @if (availability()) {
+      <div class="result" aria-live="polite">
+        <span class="result-label">Health Connect</span>
+        <span class="result-value">
+          @if (availability()!.available) {
+            Available on {{ availability()!.platform }}
+          } @else {
+            Not available on {{ availability()!.platform }}
+          }
+        </span>
+      </div>
+    }
+
     @if (echoValue()) {
       <div class="result" aria-live="polite">
         <span class="result-label">Echo result</span>

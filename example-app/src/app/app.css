@@ -96,6 +96,10 @@ h1 {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.button.secondary {
+  background: linear-gradient(135deg, #f7b267, #f25f5c);
+}
+
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

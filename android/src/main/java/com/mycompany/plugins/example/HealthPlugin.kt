@@ -5,6 +5,7 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import androidx.health.connect.client.HealthConnectClient
 
 @CapacitorPlugin(name = "Health")
 class HealthPlugin : Plugin() {
@@ -17,6 +18,17 @@ class HealthPlugin : Plugin() {
 
         val ret = JSObject()
         ret.put("value", implementation.echo(value))
+        call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun isAvailable(call: PluginCall) {
+        val status = HealthConnectClient.getSdkStatus(context)
+        val available = status == HealthConnectClient.SDK_AVAILABLE
+
+        val ret = JSObject()
+        ret.put("available", available)
+        ret.put("platform", "android")
         call.resolve(ret)
     }
 }
