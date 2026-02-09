@@ -118,28 +118,42 @@
     <header class="header">
       <h2 id="data-title">Data Operations</h2>
       <p class="subtitle">
-        Test writeSamples and readSamples methods.
+        Test writeSamples and readSamples methods with various types.
       </p>
     </header>
 
+    <div class="field">
+      <label class="label" for="data-type">Data Type</label>
+      <select id="data-type" class="input" (change)="onTypeChange($event)">
+        @for (type of availableTypes; track type) {
+        <option [value]="type" [selected]="type === selectedType()">{{ type }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="label" for="data-value">Value to Write</label>
+      <input id="data-value" class="input" type="number" [value]="dataValue()" (input)="onDataValueInput($event)" />
+    </div>
+
     <div class="actions">
-      <button type="button" class="button" [disabled]="!canWrite()" (click)="writeSteps()">
+      <button type="button" class="button" [disabled]="!canWrite()" (click)="writeData()">
         @if (isWriting()) {
         <span class="spinner" aria-hidden="true"></span>
         Writing…
         } @else {
-        Write 100 Steps
+        Write {{ dataValue() }} {{ selectedType() }}
         }
       </button>
     </div>
 
     <div class="actions">
-      <button type="button" class="button secondary" [disabled]="!canRead()" (click)="readSteps()">
+      <button type="button" class="button secondary" [disabled]="!canRead()" (click)="readData()">
         @if (isReading()) {
         <span class="spinner" aria-hidden="true"></span>
         Reading…
         } @else {
-        Read Steps (Last 24h)
+        Read {{ selectedType() }} (Last 24h)
         }
       </button>
     </div>
@@ -153,7 +167,7 @@
 
     @if (readResults()) {
     <div class="result" aria-live="polite">
-      <span class="result-label">Read Results</span>
+      <span class="result-label">Read Results ({{ selectedType() }})</span>
       <div class="result-value">
         @for (sample of readResults()!.samples; track sample.startDate) {
         <div class="sample-item">
@@ -164,7 +178,7 @@
           <div>Source: {{ sample.sourceName }}</div>
         </div>
         } @empty {
-        <div>No samples found in the last 24 hours.</div>
+        <div>No samples found for {{ selectedType() }} in the last 24 hours.</div>
         }
       </div>
     </div>

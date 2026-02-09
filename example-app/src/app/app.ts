@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { Health, HealthDataType, PermissionStatusResult, ReadSamplesResult } from 'health-demo';
+import { Health, HealthDataType, HealthUnit, PermissionStatusResult, ReadSamplesResult } from 'health-demo';
 
 @Component({
   selector: 'app-root',
@@ -27,6 +27,10 @@ export class App {
   protected readonly isReading = signal(false);
   protected readonly readResults = signal<ReadSamplesResult | null>(null);
 
+  protected readonly selectedType = signal<HealthDataType>('steps');
+  protected readonly dataValue = signal('100');
+  protected readonly availableTypes: HealthDataType[] = ['steps', 'distance', 'calories', 'heart_rate', 'sleep'];
+
   protected readonly canEcho = computed(() => {
     return this.inputValue().trim().length > 0 && !this.isBusy();
   });
@@ -34,12 +38,22 @@ export class App {
   protected readonly canCheck = computed(() => !this.isChecking());
   protected readonly canRequestAuth = computed(() => !this.isRequestingAuth());
   protected readonly canCheckAuth = computed(() => !this.isCheckingAuth());
-  protected readonly canWrite = computed(() => !this.isWriting());
+  protected readonly canWrite = computed(() => !this.isWriting() && !isNaN(parseFloat(this.dataValue())));
   protected readonly canRead = computed(() => !this.isReading());
 
   protected onInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     this.inputValue.set(target?.value ?? '');
+  }
+
+  protected onDataValueInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.dataValue.set(target?.value ?? '');
+  }
+
+  protected onTypeChange(event: Event): void {
+    const target = event.target as HTMLSelectElement | null;
+    this.selectedType.set((target?.value as HealthDataType) ?? 'steps');
   }
 
   protected async runEcho(): Promise<void> {
@@ -91,7 +105,7 @@ export class App {
     try {
       const result = await Health.requestAuthorization({
         read: ['steps', 'heart_rate', 'distance', 'calories', 'sleep'],
-        write: ['steps']
+        write: ['steps', 'heart_rate', 'distance', 'calories', 'sleep']
       });
       this.authStatus.set(result);
     } catch (error: unknown) {
@@ -119,8 +133,15 @@ export class App {
     }
   }
 
-  protected async writeSteps(): Promise<void> {
+  protected async writeData(): Promise<void> {
     if (this.isWriting()) {
+      return;
+    }
+
+    const type = this.selectedType();
+    const value = parseFloat(this.dataValue());
+    if (isNaN(value)) {
+      this.errorMessage.set('Invalid numeric value');
       return;
     }
 
@@ -130,24 +151,22 @@ export class App {
 
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const unit = this.getUnitForType(type);
 
     try {
       await Health.writeSamples({
         samples: [
           {
-            type: 'steps',
-            value: 100,
-            unit: 'count',
+            type: type,
+            value: value,
+            unit: unit,
             startDate: oneHourAgo.toISOString(),
             endDate: now.toISOString(),
             sourceName: 'Example App',
-            metadata: {
-              'my-key': 'my-value',
-            },
           },
         ],
       });
-      this.writeStatus.set('Successfully wrote 100 steps');
+      this.writeStatus.set(`Successfully wrote ${value} ${unit} to ${type}`);
     } catch (error: unknown) {
       this.errorMessage.set(this.formatError(error));
     } finally {
@@ -155,11 +174,12 @@ export class App {
     }
   }
 
-  protected async readSteps(): Promise<void> {
+  protected async readData(): Promise<void> {
     if (this.isReading()) {
       return;
     }
 
+    const type = this.selectedType();
     this.isReading.set(true);
     this.errorMessage.set(null);
     this.readResults.set(null);
@@ -169,7 +189,7 @@ export class App {
 
     try {
       const result = await Health.readSamples({
-        types: ['steps'],
+        types: [type],
         startDate: oneDayAgo.toISOString(),
         endDate: now.toISOString(),
       });
@@ -178,6 +198,23 @@ export class App {
       this.errorMessage.set(this.formatError(error));
     } finally {
       this.isReading.set(false);
+    }
+  }
+
+  private getUnitForType(type: HealthDataType): HealthUnit {
+    switch (type) {
+      case 'steps':
+        return 'count';
+      case 'distance':
+        return 'm';
+      case 'calories':
+        return 'kcal';
+      case 'heart_rate':
+        return 'bpm';
+      case 'sleep':
+        return 'min';
+      default:
+        return 'count';
     }
   }
 
