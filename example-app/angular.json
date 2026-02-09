@@ -22,7 +22,8 @@
               {
                 "glob": "**/*",
                 "input": "public"
-              }
+              },
+              "src/privacypolicy.html"
             ],
             "styles": [
               "src/styles.css"
